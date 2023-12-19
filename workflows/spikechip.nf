@@ -1,5 +1,18 @@
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    VALIDATE INPUTS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+if (params.fasta) { ch_fasta =  Channel.fromPath(params.fasta) } else { exit 1, 'Fasta reference genome not specified!' }
+
+// Modify fasta channel to include meta data
+ch_fasta_meta = ch_fasta.map{ it -> [[id:it[0].baseName], it] }.collect()
+
+/*
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     PRINT PARAMS SUMMARY
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
@@ -14,6 +27,7 @@ def summary_params = paramsSummaryMap(workflow)
 log.info logo + paramsSummaryLog(workflow) + citation
 
 WorkflowSpikechip.initialise(params, log)
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -36,6 +50,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
 include { INPUT_CHECK } from '../subworkflows/local/input_check'
+//include { PREPARE_GENOME      } from '../subworkflows/local/prepare_genome'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -49,6 +64,14 @@ include { INPUT_CHECK } from '../subworkflows/local/input_check'
 include { FASTQC                      } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
+include { BOWTIE2_ALIGN               } from '../modules/nf-core/bowtie2/align/main.nf'
+//include { SAMBAMBA_MARKDUP            } from '../modules/nf-core/sambamba/markdup/main'
+include { PICARD_MARKDUPLICATES       } from '../modules/nf-core/picard/markduplicates/main'
+include { SAMTOOLS_FAIDX              } from '../modules/nf-core/samtools/faidx/main'
+include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/main'
+
+include { SAMTOOLS_SPLITSPECIES       } from '../modules/local/samtools/splitspecies/main.nf'
+include { SAMTOOLS_FLAGSTAT           } from '../modules/local/samtools/flagstat/main.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -77,13 +100,58 @@ workflow SPIKECHIP {
     //
     // MODULE: Run FastQC
     //
+
+    TRIMMOMATIC (
+      INPUT_CHECK.out.reads  
+    )
+
     FASTQC (
-        INPUT_CHECK.out.reads
+        TRIMMOMATIC.out.trimmed_reads
     )
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
+    )
+
+    //INPUT_CHECK.out.reads.view()
+
+    ch_bowtie2_index = [ [:], file(params.bowtie2_index) ]
+
+    BOWTIE2_ALIGN (
+        TRIMMOMATIC.out.trimmed_reads,
+        ch_bowtie2_index,
+        false,
+        "sort"
+    )
+
+    ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
+
+    //SAMBAMBA_MARKDUP (BOWTIE2_ALIGN.out.aligned)
+
+    SAMTOOLS_FAIDX (
+        ch_fasta_meta,
+        [[], []]
+    )
+
+    //BOWTIE2_ALIGN.out.aligned.view()
+    PICARD_MARKDUPLICATES (
+        BOWTIE2_ALIGN.out.aligned,
+        ch_fasta_meta,
+        SAMTOOLS_FAIDX.out.fai.collect()
+    )
+
+    SAMTOOLS_SPLITSPECIES (
+      PICARD_MARKDUPLICATES.out.bam,
+      params.reference_genome,
+      params.spikein_genome 
+    )
+
+    ch_versions = ch_versions.mix(SAMTOOLS_SPLITSPECIES.out.versions.first())
+    
+    //SAMTOOLS_SPLITSPECIES.out.refbam.view()
+    SAMTOOLS_FLAGSTAT (
+        SAMTOOLS_SPLITSPECIES.out.bam
     )
 
     //
@@ -100,6 +168,8 @@ workflow SPIKECHIP {
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(BOWTIE2_ALIGN.out.log.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.flagstat.collect{it[1]}.ifEmpty([]))
 
     MULTIQC (
         ch_multiqc_files.collect(),

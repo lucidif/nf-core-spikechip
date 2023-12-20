@@ -89,75 +89,96 @@ workflow SPIKECHIP {
     //
     // SUBWORKFLOW: Read in samplesheet, validate and stage input files
     //
-    INPUT_CHECK (
-        file(params.input)
-    )
-    ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
-    // TODO: OPTIONAL, you can use nf-validation plugin to create an input channel from the samplesheet with Channel.fromSamplesheet("input")
-    // See the documentation https://nextflow-io.github.io/nf-validation/samplesheets/fromSamplesheet/
-    // ! There is currently no tooling to help you write a sample sheet schema
+
+    SAMTOOLS_FAIDX (
+            ch_fasta_meta,
+            [[], []]
+        )
+
+    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions.first())
 
     if (!params.fromBAM) {
-            //
-            // MODULE: Run FastQC
-            //
 
-            TRIMMOMATIC (
+        INPUT_CHECK (
+            file(params.input)
+        )
+        ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
+        // TODO: OPTIONAL, you can use nf-validation plugin to create an input channel from the samplesheet with Channel.fromSamplesheet("input")
+        // See the documentation https://nextflow-io.github.io/nf-validation/samplesheets/fromSamplesheet/
+        // ! There is currently no tooling to help you write a sample sheet schema
+
+
+        //
+        // MODULE: Run FastQC
+        //
+
+        TRIMMOMATIC (
             INPUT_CHECK.out.reads  
-            )
+        )
 
-            FASTQC (
-                TRIMMOMATIC.out.trimmed_reads
-            )
-            ch_versions = ch_versions.mix(FASTQC.out.versions.first())
+        FASTQC (
+            TRIMMOMATIC.out.trimmed_reads
+        )
+        ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
-            CUSTOM_DUMPSOFTWAREVERSIONS (
-                ch_versions.unique().collectFile(name: 'collated_versions.yml')
-            )
 
-            //INPUT_CHECK.out.reads.view()
+        //INPUT_CHECK.out.reads.view()
 
-            ch_bowtie2_index = [ [:], file(params.bowtie2_index) ]
+        ch_bowtie2_index = [ [:], file(params.bowtie2_index) ]
 
-            BOWTIE2_ALIGN (
-                TRIMMOMATIC.out.trimmed_reads,
-                ch_bowtie2_index,
-                false,
-                "sort"
-            )
+        BOWTIE2_ALIGN (
+            TRIMMOMATIC.out.trimmed_reads,
+            ch_bowtie2_index,
+            false,
+            "sort"
+        )
 
-            ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
+        ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
 
-            //SAMBAMBA_MARKDUP (BOWTIE2_ALIGN.out.aligned)
+        ch_bamfiles=BOWTIE2_ALIGN.out.aligned
 
-            SAMTOOLS_FAIDX (
-                ch_fasta_meta,
-                [[], []]
-            )
+        //SAMBAMBA_MARKDUP (BOWTIE2_ALIGN.out.aligned)
 
-            //BOWTIE2_ALIGN.out.aligned.view()
-            PICARD_MARKDUPLICATES (
-                BOWTIE2_ALIGN.out.aligned,
-                ch_fasta_meta,
-                SAMTOOLS_FAIDX.out.fai.collect()
-            )
-
-            SAMTOOLS_SPLITSPECIES (
-            PICARD_MARKDUPLICATES.out.bam,
-            params.reference_genome,
-            params.spikein_genome 
-            )
-
-            ch_versions = ch_versions.mix(SAMTOOLS_SPLITSPECIES.out.versions.first())
-            
-            //SAMTOOLS_SPLITSPECIES.out.refbam.view()
-            SAMTOOLS_FLAGSTAT (
-                SAMTOOLS_SPLITSPECIES.out.bam
-            )
+        //BOWTIE2_ALIGN.out.aligned.view()
                 
     } else {
+     //input start channel   
+     //[[id:SPT5_INPUT_REP2_T1, single_end:false], /mnt/c/wkdir/lucio/test_nf_spikeinchip/work/f3/67c45d925563552cb242de816b4fa3/SPT5_INPUT_REP2_T1.bam]
+
+    ch_bamfiles=channel.fromPath(params.input)
+        | splitCsv (header: true)
+        | map { row -> 
+            ssinfo = row.subMap ('id', 'single_end','bam')
+            [[id:ssinfo.id,single_end:ssinfo.single_end],ssinfo.bam]
+        }
+
+    //ch_bamfiles.view()    
 
     }
+
+    PICARD_MARKDUPLICATES (
+        ch_bamfiles,
+        ch_fasta_meta,
+        SAMTOOLS_FAIDX.out.fai.collect()
+    )
+
+    SAMTOOLS_SPLITSPECIES (
+        PICARD_MARKDUPLICATES.out.bam,
+        params.reference_genome,
+        params.spikein_genome 
+    )
+
+    ch_versions = ch_versions.mix(SAMTOOLS_SPLITSPECIES.out.versions.first())
+            
+    //SAMTOOLS_SPLITSPECIES.out.refbam.view()
+    SAMTOOLS_FLAGSTAT (
+        SAMTOOLS_SPLITSPECIES.out.bam
+    )
+                
+
+    CUSTOM_DUMPSOFTWAREVERSIONS (
+        ch_versions.unique().collectFile(name: 'collated_versions.yml')
+    )
 
 
     //
@@ -173,10 +194,13 @@ workflow SPIKECHIP {
     ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
-    ch_multiqc_files = ch_multiqc_files.mix(BOWTIE2_ALIGN.out.log.collect{it[1]}.ifEmpty([]))
-    ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.flagstat.collect{it[1]}.ifEmpty([]))
-
+    
+    if (!params.fromBAM) {
+        ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
+        ch_multiqc_files = ch_multiqc_files.mix(BOWTIE2_ALIGN.out.log.collect{it[1]}.ifEmpty([]))
+        ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.flagstat.collect{it[1]}.ifEmpty([]))
+    }
+    
     MULTIQC (
         ch_multiqc_files.collect(),
         ch_multiqc_config.toList(),

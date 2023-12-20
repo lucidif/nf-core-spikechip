@@ -97,62 +97,68 @@ workflow SPIKECHIP {
     // See the documentation https://nextflow-io.github.io/nf-validation/samplesheets/fromSamplesheet/
     // ! There is currently no tooling to help you write a sample sheet schema
 
-    //
-    // MODULE: Run FastQC
-    //
+    if (!params.fromBAM) {
+            //
+            // MODULE: Run FastQC
+            //
 
-    TRIMMOMATIC (
-      INPUT_CHECK.out.reads  
-    )
+            TRIMMOMATIC (
+            INPUT_CHECK.out.reads  
+            )
 
-    FASTQC (
-        TRIMMOMATIC.out.trimmed_reads
-    )
-    ch_versions = ch_versions.mix(FASTQC.out.versions.first())
+            FASTQC (
+                TRIMMOMATIC.out.trimmed_reads
+            )
+            ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
-    CUSTOM_DUMPSOFTWAREVERSIONS (
-        ch_versions.unique().collectFile(name: 'collated_versions.yml')
-    )
+            CUSTOM_DUMPSOFTWAREVERSIONS (
+                ch_versions.unique().collectFile(name: 'collated_versions.yml')
+            )
 
-    //INPUT_CHECK.out.reads.view()
+            //INPUT_CHECK.out.reads.view()
 
-    ch_bowtie2_index = [ [:], file(params.bowtie2_index) ]
+            ch_bowtie2_index = [ [:], file(params.bowtie2_index) ]
 
-    BOWTIE2_ALIGN (
-        TRIMMOMATIC.out.trimmed_reads,
-        ch_bowtie2_index,
-        false,
-        "sort"
-    )
+            BOWTIE2_ALIGN (
+                TRIMMOMATIC.out.trimmed_reads,
+                ch_bowtie2_index,
+                false,
+                "sort"
+            )
 
-    ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
+            ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
 
-    //SAMBAMBA_MARKDUP (BOWTIE2_ALIGN.out.aligned)
+            //SAMBAMBA_MARKDUP (BOWTIE2_ALIGN.out.aligned)
 
-    SAMTOOLS_FAIDX (
-        ch_fasta_meta,
-        [[], []]
-    )
+            SAMTOOLS_FAIDX (
+                ch_fasta_meta,
+                [[], []]
+            )
 
-    //BOWTIE2_ALIGN.out.aligned.view()
-    PICARD_MARKDUPLICATES (
-        BOWTIE2_ALIGN.out.aligned,
-        ch_fasta_meta,
-        SAMTOOLS_FAIDX.out.fai.collect()
-    )
+            //BOWTIE2_ALIGN.out.aligned.view()
+            PICARD_MARKDUPLICATES (
+                BOWTIE2_ALIGN.out.aligned,
+                ch_fasta_meta,
+                SAMTOOLS_FAIDX.out.fai.collect()
+            )
 
-    SAMTOOLS_SPLITSPECIES (
-      PICARD_MARKDUPLICATES.out.bam,
-      params.reference_genome,
-      params.spikein_genome 
-    )
+            SAMTOOLS_SPLITSPECIES (
+            PICARD_MARKDUPLICATES.out.bam,
+            params.reference_genome,
+            params.spikein_genome 
+            )
 
-    ch_versions = ch_versions.mix(SAMTOOLS_SPLITSPECIES.out.versions.first())
-    
-    //SAMTOOLS_SPLITSPECIES.out.refbam.view()
-    SAMTOOLS_FLAGSTAT (
-        SAMTOOLS_SPLITSPECIES.out.bam
-    )
+            ch_versions = ch_versions.mix(SAMTOOLS_SPLITSPECIES.out.versions.first())
+            
+            //SAMTOOLS_SPLITSPECIES.out.refbam.view()
+            SAMTOOLS_FLAGSTAT (
+                SAMTOOLS_SPLITSPECIES.out.bam
+            )
+                
+    } else {
+
+    }
+
 
     //
     // MODULE: MultiQC

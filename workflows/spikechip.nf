@@ -72,6 +72,7 @@ include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/mai
 
 include { SAMTOOLS_SPLITSPECIES       } from '../modules/local/samtools/splitspecies/main.nf'
 include { SAMTOOLS_FLAGSTAT           } from '../modules/local/samtools/flagstat/main.nf'
+include { CALCULATEDOWNFACTOR         } from '../modules/local/calculatedownfactor/main.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -107,6 +108,7 @@ workflow SPIKECHIP {
         // See the documentation https://nextflow-io.github.io/nf-validation/samplesheets/fromSamplesheet/
         // ! There is currently no tooling to help you write a sample sheet schema
 
+        //INPUT_CHECK.out.reads.view()
 
         //
         // MODULE: Run FastQC
@@ -148,8 +150,8 @@ workflow SPIKECHIP {
     ch_bamfiles=channel.fromPath(params.input)
         | splitCsv (header: true)
         | map { row -> 
-            ssinfo = row.subMap ('id', 'single_end','bam')
-            [[id:ssinfo.id,single_end:ssinfo.single_end],ssinfo.bam]
+            ssinfo = row.subMap ('id', 'single_end','condition','details','bam')
+            [[id:ssinfo.id, single_end:ssinfo.single_end, condition:ssinfo.condition, details:ssinfo.details], ssinfo.bam]
         }
 
     //ch_bamfiles.view()    
@@ -174,7 +176,27 @@ workflow SPIKECHIP {
     SAMTOOLS_FLAGSTAT (
         SAMTOOLS_SPLITSPECIES.out.bam
     )
-                
+    //SAMTOOLS_FLAGSTAT.out.flagstat.view()
+
+    //ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.collect()
+
+    ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.flatten().collect()
+
+    // ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta, path-> 
+    //     metall=flatten(meta)
+    //     path1all=flatten(path)
+    //     metall
+    // }
+
+
+    //ch_allflags.view()
+    
+    CALCULATEDOWNFACTOR (
+        ch_allflags
+       //SAMTOOLS_FLAGSTAT.out.flagstat 
+    )
+
+    //CALCULATEDOWNFACTOR.out.results.view()
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')

@@ -67,9 +67,9 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoft
 include { BOWTIE2_ALIGN               } from '../modules/nf-core/bowtie2/align/main.nf'
 //include { SAMBAMBA_MARKDUP            } from '../modules/nf-core/sambamba/markdup/main'
 include { PICARD_MARKDUPLICATES       } from '../modules/nf-core/picard/markduplicates/main'
-include { SAMTOOLS_FAIDX              } from '../modules/nf-core/samtools/faidx/main'
 include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/main'
 
+include { SAMTOOLS_FAIDX              } from '../modules/local/samtools/faidx/main'
 include { SAMTOOLS_SPLITSPECIES       } from '../modules/local/samtools/splitspecies/main.nf'
 include { SAMTOOLS_FLAGSTAT           } from '../modules/local/samtools/flagstat/main.nf'
 include { CALCULATEDOWNFACTOR         } from '../modules/local/calculatedownfactor/main.nf'

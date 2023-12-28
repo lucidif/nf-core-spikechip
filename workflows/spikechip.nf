@@ -162,41 +162,46 @@ workflow SPIKECHIP {
         ch_bamfiles,
         ch_fasta_meta,
         SAMTOOLS_FAIDX.out.fai.collect()
-    )
+        )
 
-    SAMTOOLS_SPLITSPECIES (
-        PICARD_MARKDUPLICATES.out.bam,
-        params.reference_genome,
-        params.spikein_genome 
-    )
+    if (!params.onlyBAM) {
+
+
+        SAMTOOLS_SPLITSPECIES (
+            PICARD_MARKDUPLICATES.out.bam,
+            params.reference_genome,
+            params.spikein_genome 
+        )
 
     ch_versions = ch_versions.mix(SAMTOOLS_SPLITSPECIES.out.versions.first())
             
-    //SAMTOOLS_SPLITSPECIES.out.refbam.view()
-    SAMTOOLS_FLAGSTAT (
-        SAMTOOLS_SPLITSPECIES.out.bam
-    )
-    //SAMTOOLS_FLAGSTAT.out.flagstat.view()
+        //SAMTOOLS_SPLITSPECIES.out.refbam.view()
+        SAMTOOLS_FLAGSTAT (
+            SAMTOOLS_SPLITSPECIES.out.bam
+        )
+        //SAMTOOLS_FLAGSTAT.out.flagstat.view()
 
-    //ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.collect()
+        //ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.collect()
 
-    ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.flatten().collect()
+        ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.flatten().collect()
 
-    // ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta, path-> 
-    //     metall=flatten(meta)
-    //     path1all=flatten(path)
-    //     metall
-    // }
+        // ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta, path-> 
+        //     metall=flatten(meta)
+        //     path1all=flatten(path)
+        //     metall
+        // }
 
 
-    //ch_allflags.view()
+        //ch_allflags.view()
     
-    CALCULATEDOWNFACTOR (
-        ch_allflags
-       //SAMTOOLS_FLAGSTAT.out.flagstat 
-    )
+        CALCULATEDOWNFACTOR (
+            ch_allflags
+        //SAMTOOLS_FLAGSTAT.out.flagstat 
+        )
 
-    //CALCULATEDOWNFACTOR.out.results.view()
+        //CALCULATEDOWNFACTOR.out.results.view()
+            
+    }        
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
@@ -217,11 +222,16 @@ workflow SPIKECHIP {
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
     
+    
     if (!params.fromBAM) {
         ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
         ch_multiqc_files = ch_multiqc_files.mix(BOWTIE2_ALIGN.out.log.collect{it[1]}.ifEmpty([]))
+    }
+
+    if (!params.onlyBAM) {
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.flagstat.collect{it[1]}.ifEmpty([]))
     }
+
     
     MULTIQC (
         ch_multiqc_files.collect(),

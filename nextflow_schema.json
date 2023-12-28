@@ -40,6 +40,11 @@
                     "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
                     "fa_icon": "fas fa-file-signature"
                 },
+                "onlyBAM": {
+                    "type" : "boolean",
+                    "description": "the workflow end after bam creation steps",
+                    "help_text": "the workflow produce only bam files without spikein steps"
+                },
                 "fromBAM": {
                     "type" : "boolean",
                     "description": "start from bam file instead of fastq",

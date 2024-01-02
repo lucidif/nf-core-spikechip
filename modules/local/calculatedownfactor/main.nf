@@ -43,16 +43,22 @@ process CALCULATEDOWNFACTOR {
     //               https://github.com/nf-core/modules/blob/master/modules/nf-core/bwa/index/main.nf
     // TODO nf-core: Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
-    //tuple val(meta1), val(meta2), path(bam1), path(bam2)
-    //tuple 
-    val(meta)//, path(bam_ref)//, path(bam_spikein) 
+    tuple val(meta), path(bam)
+    tuple val(meta2), path(bam2)
+    //tuple
+    //tuple val(std_meta), path(std_path) 
+    //val(meta)//, path(bam_ref)//, path(bam_spikein) 
+    //val(in_path)
 
     output:
     // TODO nf-core: Named file extensions MUST be emitted for ALL output channels
     //tuple val(meta), path("*.bam"), emit: bam
     // TODO nf-core: List additional required output channels/values here
     //path "versions.yml"           , emit: versions
-    tuple val(meta), path("*.RData")              , emit: results
+    //tuple val(meta), path("down_factor.txt")        , emit: results
+    //path("down_factor.txt")                         , emit: downfile
+    path("down_factor.txt")                            , emit: downfile
+    //val (ch_newmeta)                              , emit: downfactor 
 
     when:
     task.ext.when == null || task.ext.when
@@ -77,13 +83,20 @@ process CALCULATEDOWNFACTOR {
     //    bam_list_ch
     //         .map { it[0].collate(2) } // Raggruppa ogni due elementi
     //         .set { paired_bam_list_ch }
+                
+    //flatpath=in_path.flatten()
 
+    //println(paths)
+    //paths.view()
 
     //template 'calculate_downsampling_factor.R'
 
     """
     cal_subfactor.R '${meta}'
     """
+
+    // dwnfile=file("down_factor.txt")
+
 
     //stub:
 

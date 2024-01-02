@@ -73,6 +73,8 @@ include { SAMTOOLS_FAIDX              } from '../modules/local/samtools/faidx/ma
 include { SAMTOOLS_SPLITSPECIES       } from '../modules/local/samtools/splitspecies/main.nf'
 include { SAMTOOLS_FLAGSTAT           } from '../modules/local/samtools/flagstat/main.nf'
 include { CALCULATEDOWNFACTOR         } from '../modules/local/calculatedownfactor/main.nf'
+include { SAMTOOLS_DOWNSAMPLING       } from '../modules/local/samtools/downsampling/main.nf'
+include { SAMTOOLS_MERGE              } from '../modules/local/samtools/merge/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -181,26 +183,107 @@ workflow SPIKECHIP {
         )
         //SAMTOOLS_FLAGSTAT.out.flagstat.view()
 
-        //ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.collect()
+        //ch_meta_hub=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta,path -> meta}.collect()
+        //ch_path_hub=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta,path -> path}.collect()
 
-        ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.flatten().collect()
+        ch_reference_hub=SAMTOOLS_FLAGSTAT.out.reference.flatten().collect()
+                            .map{ tuplain -> 
+                            def evenTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 0 }
+                            def oddTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 1 }
 
-        // ch_allflags=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta, path-> 
-        //     metall=flatten(meta)
-        //     path1all=flatten(path)
-        //     metall
-        // }
+                            [evenTuple,oddTuple]
 
+                             }
 
-        //ch_allflags.view()
-    
+        ch_spikein_hub=SAMTOOLS_FLAGSTAT.out.spikein.flatten().collect()
+                            .map{ tuplain -> 
+                            def evenTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 0 }
+                            def oddTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 1 }
+
+                            [evenTuple,oddTuple]
+
+                             }                     
+        
+        ch_meta_collect=SAMTOOLS_FLAGSTAT.out.reference.map{meta, path -> 
+            newmeta=meta.collect()
+        }
+
+ 
+
+        //ch_reference_hub.view()
+        //ch_spikein_hub.view()
+  
         CALCULATEDOWNFACTOR (
-            ch_allflags
-        //SAMTOOLS_FLAGSTAT.out.flagstat 
+            ch_reference_hub,
+            ch_spikein_hub
         )
 
-        //CALCULATEDOWNFACTOR.out.results.view()
-            
+        downfl=CALCULATEDOWNFACTOR.out.downfile.flatten()
+        //downfl.view()
+
+        ch_downfact=downfl
+            | splitCsv (header: true)
+            | map { row -> 
+                downss = row.subMap ('id', 'single_end','condition','details','downfactor')
+                [[id:downss.id, single_end:downss.single_end, condition:downss.condition, details:downss.details, downfactor:downss.downfactor]]
+            }
+
+        //ch_downfact.flatten().view()
+        //SAMTOOLS_SPLITSPECIES.out.bam.view()
+
+        ch_downfact.flatten()
+        .map{ meta -> 
+            id=meta.id
+            [id, meta]
+        }
+        .set{ch_downfc_by_id}
+
+        SAMTOOLS_SPLITSPECIES.out.bam.map{meta, ref_bam, spike_bam ->
+            id=meta.subMap('id')
+            [id.id, ref_bam]
+        }set{ch_bam_by_id}
+
+        ch_downfc_by_id
+            .combine(ch_bam_by_id, by:0)
+            .map{id,meta,bam -> 
+            [meta,bam]
+            }
+            .set{ch_downfc}
+
+        //ch_downin.filter{it[0].downfactor < 1}.view()
+        ch_downin=ch_downfc.filter{it[0].downfactor.toFloat() < 1}
+        ch_nodown=ch_downfc.filter{it[0].downfactor.toFloat() >= 1}
+
+        SAMTOOLS_DOWNSAMPLING(
+            ch_downin
+        )
+
+        ch_tomerge=SAMTOOLS_DOWNSAMPLING.out.bam.mix(ch_nodown)
+
+        //ch_tomerge.view()
+
+        ch_tomerge.map{ meta, path -> 
+                        condition=meta.subMap('condition')
+                        meta=meta
+                        path=path
+                        [condition.condition, meta, path]
+                      }
+                .groupTuple()
+                //.flatten()
+                .map{condition, meta, path->
+                    //meta.id=meta.condition
+                    //id=meta.subMap('condition')
+                    //single_end=meta.subMap('single_end')
+                    [[id:meta.condition[0], single_end:meta.single_end[0]], path]
+                }.set{ch_mergeBam}
+
+        //ch_mergeBam.view()
+
+        SAMTOOLS_MERGE (
+            ch_mergeBam
+        )
+ 
+
     }        
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
@@ -229,7 +312,8 @@ workflow SPIKECHIP {
     }
 
     if (!params.onlyBAM) {
-        ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.flagstat.collect{it[1]}.ifEmpty([]))
+        ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.reference.collect{it[1]}.ifEmpty([]))
+        ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.spikein.collect{it[1]}.ifEmpty([]))
     }
 
     

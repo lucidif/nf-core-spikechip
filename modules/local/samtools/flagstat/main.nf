@@ -11,7 +11,8 @@ process SAMTOOLS_FLAGSTAT {
     tuple val(meta), path(refbam), path(spikebam)
 
     output:
-    tuple val(meta), path("*.flagstat"), emit: flagstat
+    tuple val(meta), path("*_ref.flagstat"), emit: reference
+    tuple val(meta), path("*_spike.flagstat"), emit: spikein
     path  "versions.yml"               , emit: versions
 
     when:

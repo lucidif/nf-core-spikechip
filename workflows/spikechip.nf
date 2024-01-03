@@ -68,6 +68,8 @@ include { BOWTIE2_ALIGN               } from '../modules/nf-core/bowtie2/align/m
 //include { SAMBAMBA_MARKDUP            } from '../modules/nf-core/sambamba/markdup/main'
 include { PICARD_MARKDUPLICATES       } from '../modules/nf-core/picard/markduplicates/main'
 include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/main'
+include { DEEPTOOLS_BAMCOVERAGE       } from '../modules/nf-core/deeptools/bamcoverage/main' 
+include { BEDTOOLS_MERGE } from '../modules/nf-core/bedtools/merge/main'
 
 include { SAMTOOLS_FAIDX              } from '../modules/local/samtools/faidx/main'
 include { SAMTOOLS_SPLITSPECIES       } from '../modules/local/samtools/splitspecies/main.nf'
@@ -282,6 +284,16 @@ workflow SPIKECHIP {
         SAMTOOLS_MERGE (
             ch_mergeBam
         )
+
+        SAMTOOLS_MERGE.out.bam.view()
+
+        // DEEPTOOLS_BAMCOVERAGE (
+        //     SAMTOOLS_MERGE.out.bam,
+        //     ch_fasta_meta,
+        //     SAMTOOLS_FAIDX.out.fai.collect()
+        // )
+
+
  
 
     }        

@@ -13,7 +13,7 @@ process SAMTOOLS_MERGE {
     //tuple val(meta3), path(fai)
 
     output:
-    tuple val(meta), path("${prefix}.bam") , optional:true, emit: bam
+    tuple val(meta), path("${prefix}.bam") ,  emit: bam
     //tuple val(meta), path("${prefix}.cram"), optional:true, emit: cram
     //tuple val(meta), path("*.csi")         , optional:true, emit: csi
     //tuple val(meta), path("*.crai")        , optional:true, emit: crai
@@ -30,11 +30,18 @@ process SAMTOOLS_MERGE {
     //def reference = fasta ? "--reference ${fasta}" : ""
     """
     samtools \\
+        view \\
+        -H \\
+        $input_files > header.sam
+
+    samtools \\
         merge \\
         --threads ${task.cpus-1} \\
         $args \\
         ${prefix}_mg.bam \\
         $input_files
+
+    
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

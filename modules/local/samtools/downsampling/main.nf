@@ -43,8 +43,38 @@ process SAMTOOLS_DOWNSAMPLING {
         --subsample-seed 123 \\
         --subsample ${downFactor} \\
         -b \\
-        -o ${outname}.bam \\
+        -o pgin.bam \\
         ${input}
+
+    samtools \\
+        view \\
+        --threads ${task.cpus-1} \\
+        -H \\
+        pgin.bam > pg.header.sam
+
+    awk '!/^@PG/' pg.header.sam > nopg.header.sam
+
+    samtools \\
+        reheader \\
+        nopg.header.sam \\
+        pgin.bam > ${outname}.bam
+
+    samtools \\
+        view \\
+        --threads ${task.cpus-1} \\
+        -H \\
+        ${outname}.bam > post.header.sam
+
+    samtools \\
+        view \\
+        ${input} | head -n 30 > in30lines.sam
+
+        samtools \\
+        view \\
+        ${input} | head -n 30 > in30lines.sam    
+
+
+    rm pgin.bam
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

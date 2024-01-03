@@ -285,13 +285,20 @@ workflow SPIKECHIP {
             ch_mergeBam
         )
 
-        SAMTOOLS_MERGE.out.bam.view()
+        //SAMTOOLS_MERGE.out.bam.view{"SAMTOOLS_MERGE.out.bam : ${it}"}
+        //ch_fasta_meta.view{"ch_fasta_meta : ${it}"}
 
-        // DEEPTOOLS_BAMCOVERAGE (
-        //     SAMTOOLS_MERGE.out.bam,
-        //     ch_fasta_meta,
-        //     SAMTOOLS_FAIDX.out.fai.collect()
-        // )
+        //SAMTOOLS_FAIDX.out.fai.view{"SAMTOOLS_FAIDX.out.fai : ${it}"}
+
+        SAMTOOLS_FAIDX.out.fai.map{meta,path -> [path]}.set{faidx_path}
+
+        //faidx_path.flatten().view()
+
+        DEEPTOOLS_BAMCOVERAGE (
+            SAMTOOLS_MERGE.out.bam,
+            params.fasta,
+            faidx_path
+        )
 
 
  

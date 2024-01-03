@@ -13,7 +13,7 @@ process SAMTOOLS_MERGE {
     //tuple val(meta3), path(fai)
 
     output:
-    tuple val(meta), path("${prefix}.bam") ,  emit: bam
+    tuple val(meta), path("${prefix}_mg.bam"), path("${prefix}_mg.bam.bai") ,  emit: bam
     //tuple val(meta), path("${prefix}.cram"), optional:true, emit: cram
     //tuple val(meta), path("*.csi")         , optional:true, emit: csi
     //tuple val(meta), path("*.crai")        , optional:true, emit: crai
@@ -41,7 +41,18 @@ process SAMTOOLS_MERGE {
         ${prefix}_mg.bam \\
         $input_files
 
-    
+    samtools \\
+        sort \\
+        --threads ${task.cpus-1} \\
+        -o ${prefix}_sort_mg.bam \\
+        ${prefix}_mg.bam
+
+    samtools \\
+        index \\
+        -@ ${task.cpus-1} \\
+        $args \\
+        ${prefix}_mg.bam
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

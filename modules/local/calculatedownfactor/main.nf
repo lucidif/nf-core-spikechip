@@ -57,7 +57,7 @@ process CALCULATEDOWNFACTOR {
     //path "versions.yml"           , emit: versions
     //tuple val(meta), path("down_factor.txt")        , emit: results
     //path("down_factor.txt")                         , emit: downfile
-    path("down_factor.txt")                            , emit: downfile
+    path("*_down_factor.txt")                            , emit: downfile
     //val (ch_newmeta)                              , emit: downfactor 
 
     when:

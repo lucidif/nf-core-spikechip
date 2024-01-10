@@ -69,8 +69,8 @@ for (i in 1:length(input.table$id)){
   spikein_stats<-read.delim(spikein_file,sep="\n",header=FALSE)
   spikein_aln_reads[i]<-as.numeric(strsplit(spikein_stats[7,1]," \\+ ")[[1]][1])
 
-  condition.table<-subset(input.table,input.table$condition==input.table$condition[i])  
-  condition.input<-condition.table[which(condition.table$details=="INPUT"),]
+  condition.table<-subset(input.table,input.table$details==input.table$details[i])  
+  condition.input<-condition.table[which(condition.table$condition=="INPUT"),]
   
   input_ref_file<-paste0(condition.input$id[1],"_ref.flagstat")
   input_spikein_file<-paste0(condition.input$id[1],"_spike.flagstat")
@@ -87,22 +87,47 @@ for (i in 1:length(input.table$id)){
 
 out.table<-data.frame(id=input.table$id, single_end=input.table$single_end, condition=input.table$condition, details=input.table$details,ref_aln_reads, spikein_aln_reads,calib.eq)
 
-out.table.noin<-subset(out.table,out.table$details!="INPUT")
+out.table.noin<-subset(out.table,out.table$condition!="INPUT")
 
-alpha_ref_calib<-out.table.noin[which(out.table.noin$calib.eq==max(out.table.noin$calib.eq)),"calib.eq"]
+for (i in 1:length(unique(out.table.noin$details))){
+  
+  rep=out.table.noin$details[i]
+  
+  repsamp.table<-out.table.noin[which(out.table.noin$details==rep),]
+  
+  #alpha_ref_calib<-repsamp.table[which(repsamp.table$calib.eq==max(repsamp.table$calib.eq)),"calib.eq"]
+  
+  alpha=1/max(out.table.noin$calib.eq)
+  
+  #out.table.alpha<-data.frame(repsamp.table, alpha=repsamp.table$calib.eq*(1/max(out.table.noin$calib.eq)))
+  
+  #out.table.downfact<-data.frame(out.table.alpha, downfactor=repsamp.table$calib.eq*out.table.alpha$alpha)
+  
+  out.table.downfact<-data.frame(out.table.noin, downfactor=repsamp.table$calib.eq*alpha)
+  
+  out.table.export<-merge(input.table,out.table.downfact[,c("id","downfactor")],by=1)
+  
+  save(out.table.export, file=paste0(rep,"_output.RData"))
+  
+  write.table(out.table.export, file=paste0(rep,"_down_factor.txt"),
+              sep=",", col.names = TRUE, quote=FALSE, row.names = FALSE)
+  
+}
 
-alpha=1/max(out.table.noin$calib.eq)
-
-out.table.downfact<-data.frame(out.table.noin, downfactor=out.table.noin$calib.eq*alpha)
-
-out.table.export<-merge(input.table,out.table.downfact[,c("id","downfactor")],by=1)
-
-#total_ref_aln_reads<-sum(ref_aln_reads)
-#total_spikein_aln_reads<-sum(spikein_aln_reads)
-
-save(out.table.export, file="output.RData")
-
-write.table(out.table.export, file="down_factor.txt",
-            sep=",", col.names = TRUE, quote=FALSE, row.names = FALSE)
-
+# alpha_ref_calib<-out.table.noin[which(out.table.noin$calib.eq==max(out.table.noin$calib.eq)),"calib.eq"]
+# 
+# alpha=1/max(out.table.noin$calib.eq)
+# 
+# out.table.downfact<-data.frame(out.table.noin, downfactor=out.table.noin$calib.eq*alpha)
+# 
+# out.table.export<-merge(input.table,out.table.downfact[,c("id","downfactor")],by=1)
+# 
+# #total_ref_aln_reads<-sum(ref_aln_reads)
+# #total_spikein_aln_reads<-sum(spikein_aln_reads)
+# 
+# save(out.table.export, file="output.RData")
+# 
+# write.table(out.table.export, file="down_factor.txt",
+#             sep=",", col.names = TRUE, quote=FALSE, row.names = FALSE)
+# 
 

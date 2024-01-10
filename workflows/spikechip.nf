@@ -154,7 +154,7 @@ workflow SPIKECHIP {
     ch_bamfiles=channel.fromPath(params.input)
         | splitCsv (header: true)
         | map { row -> 
-            ssinfo = row.subMap ('id', 'single_end','condition','details','bam')
+            ssinfo = row.subMap ('id', 'single_end','condition','details','analysis','bam')
             [[id:ssinfo.id, single_end:ssinfo.single_end, condition:ssinfo.condition, details:ssinfo.details], ssinfo.bam]
         }
 
@@ -188,37 +188,72 @@ workflow SPIKECHIP {
         //ch_meta_hub=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta,path -> meta}.collect()
         //ch_path_hub=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta,path -> path}.collect()
 
-        ch_reference_hub=SAMTOOLS_FLAGSTAT.out.reference.flatten().collect()
-                            .map{ tuplain -> 
-                            def evenTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 0 }
-                            def oddTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 1 }
+        //SAMTOOLS_FLAGSTAT.out.reference.groupTuple{it.analysis}.view()
 
-                            [evenTuple,oddTuple]
-
-                             }
-
-        ch_spikein_hub=SAMTOOLS_FLAGSTAT.out.spikein.flatten().collect()
-                            .map{ tuplain -> 
-                            def evenTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 0 }
-                            def oddTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 1 }
-
-                            [evenTuple,oddTuple]
-
-                             }                     
-        
-        ch_meta_collect=SAMTOOLS_FLAGSTAT.out.reference.map{meta, path -> 
-            newmeta=meta.collect()
+        SAMTOOLS_FLAGSTAT.out.reference.map{meta,path -> 
+         an=meta.subMap('analysis')
+         [an.analysis, meta,path]
+        }.groupTuple()
+        .map {an, meta, path -> 
+         [meta,path] 
         }
+        .set{ch_refstat_by_analysis}
+
+        //ch_refstat_by_analysis.view()
+
+        SAMTOOLS_FLAGSTAT.out.spikein
+            .map{meta,path -> 
+                an=meta.subMap('analysis')
+                [an.analysis, meta,path]
+            }.groupTuple()
+                .map {an, meta, path -> 
+                [meta,path] 
+            }
+            .set{ch_spikestat_by_analysis}
+
+        // ch_reference_hub=SAMTOOLS_FLAGSTAT.out.reference.flatten().collect()
+        //                     .map{ tuplain -> 
+        //                     def evenTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 0 }
+        //                     def oddTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 1 }
+
+        //                     [evenTuple,oddTuple]
+
+        //                      }
+
+        // ch_spikein_hub=SAMTOOLS_FLAGSTAT.out.spikein.flatten().collect()
+        //                     .map{ tuplain -> 
+        //                     def evenTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 0 }
+        //                     def oddTuple = tuplain.findAll { tuplain.indexOf(it) % 2 == 1 }
+
+        //                     [evenTuple,oddTuple]
+
+        //                      }                   
+        
+        // ch_meta_collect=SAMTOOLS_FLAGSTAT.out.reference.map{meta, path -> 
+        //     newmeta=meta.collect()
+        // }
 
  
 
         //ch_reference_hub.view()
-        //ch_spikein_hub.view()
+        //ch_spikein_hub.view{"spikein: ${it}"}
+
+        //split by analysis
+
   
+        // CALCULATEDOWNFACTOR (
+        //    ch_reference_hub,
+        //    ch_spikein_hub
+        // )
+
+        //TODO filter analysis replicates without input
+
         CALCULATEDOWNFACTOR (
-            ch_reference_hub,
-            ch_spikein_hub
+           ch_refstat_by_analysis,
+           ch_spikestat_by_analysis
         )
+
+        //CALCULATEDOWNFACTOR.out.downfile.view()
 
         downfl=CALCULATEDOWNFACTOR.out.downfile.flatten()
         //downfl.view()
@@ -256,6 +291,8 @@ workflow SPIKECHIP {
         ch_downin=ch_downfc.filter{it[0].downfactor.toFloat() < 1}
         ch_nodown=ch_downfc.filter{it[0].downfactor.toFloat() >= 1}
 
+        //ch_downin.view()
+
         SAMTOOLS_DOWNSAMPLING(
             ch_downin
         )
@@ -285,7 +322,7 @@ workflow SPIKECHIP {
             ch_mergeBam
         )
 
-        //SAMTOOLS_MERGE.out.bam.view{"SAMTOOLS_MERGE.out.bam : ${it}"}
+        SAMTOOLS_MERGE.out.bam.view{"SAMTOOLS_MERGE.out.bam : ${it}"}
         //ch_fasta_meta.view{"ch_fasta_meta : ${it}"}
 
         //SAMTOOLS_FAIDX.out.fai.view{"SAMTOOLS_FAIDX.out.fai : ${it}"}

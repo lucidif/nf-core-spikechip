@@ -55,79 +55,144 @@ for (i in 1:length(meta_unformat)){
 save(meta.format, file="inputs.RData")
 
 input.table<-as.data.frame(meta.format)
-ref_aln_reads<-c()
-spikein_aln_reads<-c()
-calib.eq<-c()
-for (i in 1:length(input.table$id)){
-  
-  ref_file=paste0(input.table$id[i],"_ref.flagstat")
-  spikein_file=paste0(input.table$id[i],"_spike.flagstat")
-  
-  ref_stats<-read.delim(ref_file,sep="\n",header=FALSE)
-  ref_aln_reads[i]<-as.numeric(strsplit(ref_stats[7,1]," \\+ ")[[1]][1])
-  
-  spikein_stats<-read.delim(spikein_file,sep="\n",header=FALSE)
-  spikein_aln_reads[i]<-as.numeric(strsplit(spikein_stats[7,1]," \\+ ")[[1]][1])
 
-  condition.table<-subset(input.table,input.table$details==input.table$details[i])  
-  condition.input<-condition.table[which(condition.table$condition=="INPUT"),]
+
+#colnames=("id", "single_end", "condition", "details", "analysis", "calib.eq", "perc_spikein_in_sample", "perc_spikein_in_input", "scaling_factor")
+
+for (j in 1:length(unique(input.table$analysis))){
   
-  input_ref_file<-paste0(condition.input$id[1],"_ref.flagstat")
-  input_spikein_file<-paste0(condition.input$id[1],"_spike.flagstat")
+  project.name<-unique(input.table$analysis)[j]
+  project.table<- subset(input.table, input.table$analysis==project.name)
   
-  input_ref<-read.delim(input_ref_file,sep="\n",header=FALSE)
-  input_ref_aln<-as.numeric(strsplit(input_ref[7,1]," \\+ ")[[1]][1])
+  ref_aln_reads<-c()
+  spikein_aln_reads<-c()
+  calib.eq<-c()
   
-  input_spikein<-read.delim(input_spikein_file,sep="\n",header=FALSE)
-  input_spikein_aln<-as.numeric(strsplit(input_spikein[7,1]," \\+ ")[[1]][1])
+  perc_spikein_in_sample<-c()
+  perc_spikein_in_input<-c()
   
-  calib.eq[i]<-(1/spikein_aln_reads[i])*(input_spikein_aln/input_ref_aln)
+  project<-c()
+  sampname<-c()
+  
+  scaling_factor<-c()
+  
+  no_input_scaling<-c()
+  
+  for (i in 1:length(project.table$id)){
     
+    project[i]<-project.name
+    sampname[i]<-project.table$id[i]
+        
+    ref_file=paste0(project.table$id[i],"_ref.flagstat")
+    spikein_file=paste0(project.table$id[i],"_spike.flagstat")
+    
+    ref_stats<-read.delim(ref_file,sep="\n",header=FALSE)
+    ref_aln_reads[i]<-as.numeric(strsplit(ref_stats[7,1]," \\+ ")[[1]][1])
+    
+    spikein_stats<-read.delim(spikein_file,sep="\n",header=FALSE)
+    spikein_aln_reads[i]<-as.numeric(strsplit(spikein_stats[7,1]," \\+ ")[[1]][1])
+    
+    condition.table<-subset(project.table,project.table$details==project.table$details[i])  
+    condition.input<-condition.table[which(condition.table$condition=="INPUT"),]
+    
+    input_ref_file<-paste0(condition.input$id[1],"_ref.flagstat")
+    input_spikein_file<-paste0(condition.input$id[1],"_spike.flagstat")
+    
+    input_ref<-read.delim(input_ref_file,sep="\n",header=FALSE)
+    input_ref_aln<-as.numeric(strsplit(input_ref[7,1]," \\+ ")[[1]][1])
+    
+    perc_spikein_in_sample[i]=spikein_aln_reads[i]/(ref_aln_reads[i]+spikein_aln_reads[i])
+    
+    if(nrow(condition.input)!=0){ #if there are no inputs skip input based normalization
+      input_spikein<-read.delim(input_spikein_file,sep="\n",header=FALSE)
+      input_spikein_aln<-as.numeric(strsplit(input_spikein[7,1]," \\+ ")[[1]][1])
+      
+      #Fursova 2019
+      calib.eq[i]<-(1/spikein_aln_reads[i])*(input_spikein_aln/input_ref_aln)
+      
+      #Larson 2019
+      perc_spikein_in_input[i]=input_spikein_aln/(input_ref_aln+input_spikein_aln)
+      scaling_factor[i]=perc_spikein_in_input[i]/perc_spikein_in_sample[i]
+    }
+    
+    
+  }
+  
+  res.table<-data.frame(id=project.table$id, single_end=project.table$single_end, condition=project.table$condition, details=project.table$details,analysis=project.table$analysis,ref_aln_reads, spikein_aln_reads,calib.eq, perc_spikein_in_sample, perc_spikein_in_input, scaling_factor)
+  
+    if(j==1){
+      out.table<-res.table
+    } else {
+      out.table<-rbind(out.table,res.table)
+    
+  }
+  
+  
+  
+  
 }
 
-out.table<-data.frame(id=input.table$id, single_end=input.table$single_end, condition=input.table$condition, details=input.table$details,ref_aln_reads, spikein_aln_reads,calib.eq)
+#no input normalization
+constant=max(out.table$spikein_aln_reads)
+constant/out.table$spikein_aln_reads
+out.table<-cbind(out.table,noinputNorm=constant/out.table$spikein_aln_reads)
+
+out.table.noinNorm<-out.table[,c("id", "single_end", "condition", "details", "analysis", "noinputNorm")]
+
+write.table(out.table.noinNorm, file=paste0("noinput_norm.txt"),
+            sep=",", col.names = TRUE, quote=FALSE, row.names = FALSE)
 
 out.table.noin<-subset(out.table,out.table$condition!="INPUT")
 
-for (i in 1:length(unique(out.table.noin$details))){
-  
-  rep=out.table.noin$details[i]
-  
-  repsamp.table<-out.table.noin[which(out.table.noin$details==rep),]
-  
-  #alpha_ref_calib<-repsamp.table[which(repsamp.table$calib.eq==max(repsamp.table$calib.eq)),"calib.eq"]
-  
-  alpha=1/max(out.table.noin$calib.eq)
-  
-  #out.table.alpha<-data.frame(repsamp.table, alpha=repsamp.table$calib.eq*(1/max(out.table.noin$calib.eq)))
-  
-  #out.table.downfact<-data.frame(out.table.alpha, downfactor=repsamp.table$calib.eq*out.table.alpha$alpha)
-  
-  out.table.downfact<-data.frame(out.table.noin, downfactor=repsamp.table$calib.eq*alpha)
-  
-  out.table.export<-merge(input.table,out.table.downfact[,c("id","downfactor")],by=1)
-  
-  save(out.table.export, file=paste0(rep,"_output.RData"))
-  
-  write.table(out.table.export, file=paste0(rep,"_down_factor.txt"),
+alpha=1/max(out.table.noin$calib.eq)
+
+out.table.noin<-cbind(out.table.noin,alpha=rep(alpha,length(out.table.noin$calib.eq)))
+out.table.noin<-cbind(out.table.noin,downfactor=out.table.noin$calib.eq*out.table.noin$alpha)
+
+
+
+out.table.export<-out.table.noin[,c("id", "single_end", "condition", "details", "analysis", "downfactor")]
+
+save(out.table.export, file=paste0("norm_output.RData"))
+write.table(out.table.export, file=paste0("norm_down_factor.txt"),
               sep=",", col.names = TRUE, quote=FALSE, row.names = FALSE)
   
-}
+  # # project.table.noin<-subset(out.table.noin, 
+  # #                            out.table.noin$analysis==unique(out.table.noin$analysis)[j])
+  # # 
+  # for (i in 1:length(unique(out.table.noin$details))){ #by replicate
+  #   
+  #   rep=out.table.noin$details[i]
+  #   
+  #   repsamp.table<-out.table.noin[which(out.table.noin$details==rep),]
+  #   
+  #   #alpha_ref_calib<-repsamp.table[which(repsamp.table$calib.eq==max(repsamp.table$calib.eq)),"calib.eq"]
+  #   
+  #   
+  #   maxScaling=max(repsamp.table$scaling_factor)
+  #   
+  #   #normalized scaling is scaling factor /max scaling factor 
+  #   repsamp.table=data.frame(repsamp.table,norm_scaling_factor=repsamp.table$scaling_factor/maxScaling)
+  #   
+  #   #out.table.alpha<-data.frame(repsamp.table, alpha=repsamp.table$calib.eq*(1/max(out.table.noin$calib.eq)))
+  #   
+  #   #out.table.downfact<-data.frame(out.table.alpha, downfactor=repsamp.table$calib.eq*out.table.alpha$alpha)
+  #   
+  #   out.table.downfact<-data.frame(repsamp.table, downfactor=repsamp.table$calib.eq*alpha)
+  #   
+  #   out.table.export<-merge(input.table,out.table.downfact[,c("id","downfactor")],by=1)
+  #   
+  #   save(out.table.export, file=paste0(rep,"_output.RData"))
+  #   
+  #   write.table(out.table.export, file=paste0(rep,"_down_factor.txt"),
+  #               sep=",", col.names = TRUE, quote=FALSE, row.names = FALSE)
+  #   
+  # }
+  # 
+  # 
 
-# alpha_ref_calib<-out.table.noin[which(out.table.noin$calib.eq==max(out.table.noin$calib.eq)),"calib.eq"]
-# 
-# alpha=1/max(out.table.noin$calib.eq)
-# 
-# out.table.downfact<-data.frame(out.table.noin, downfactor=out.table.noin$calib.eq*alpha)
-# 
-# out.table.export<-merge(input.table,out.table.downfact[,c("id","downfactor")],by=1)
-# 
-# #total_ref_aln_reads<-sum(ref_aln_reads)
-# #total_spikein_aln_reads<-sum(spikein_aln_reads)
-# 
-# save(out.table.export, file="output.RData")
-# 
-# write.table(out.table.export, file="down_factor.txt",
-#             sep=",", col.names = TRUE, quote=FALSE, row.names = FALSE)
-# 
+
+
+
+
 

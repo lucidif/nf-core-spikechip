@@ -13,7 +13,7 @@ process SAMTOOLS_DOWNSAMPLING {
     //path qname
 
     output:
-    tuple val(meta), path("*.bam"),  emit: bam
+    tuple val(meta), path("*.bam"), path("*.bai"),  emit: bam
     //tuple val(meta), path("*.cram"), emit: cram,    optional: true
     //tuple val(meta), path("*.sam"),  emit: sam,     optional: true
     //tuple val(meta), path("*.bai"),  emit: bai,     optional: true
@@ -61,6 +61,11 @@ process SAMTOOLS_DOWNSAMPLING {
    
 
     rm pgin.bam
+
+    samtools \\
+        index \\
+        -@ ${task.cpus-1} \\
+        ${outname}.bam
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

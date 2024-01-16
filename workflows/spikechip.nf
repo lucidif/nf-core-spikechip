@@ -156,10 +156,10 @@ workflow SPIKECHIP {
         | splitCsv (header: true)
         | map { row -> 
             ssinfo = row.subMap ('id', 'single_end','condition','details','analysis','bam')
-            [[id:ssinfo.id, single_end:ssinfo.single_end, condition:ssinfo.condition, details:ssinfo.details], ssinfo.bam]
+            [[id:ssinfo.id, single_end:ssinfo.single_end, condition:ssinfo.condition, details:ssinfo.details, analysis:ssinfo.analysis], ssinfo.bam]
         }
 
-    ch_bamfiles.view()    
+    //ch_bamfiles.view()    
 
     }
 

@@ -159,7 +159,7 @@ workflow SPIKECHIP {
             [[id:ssinfo.id, single_end:ssinfo.single_end, condition:ssinfo.condition, details:ssinfo.details], ssinfo.bam]
         }
 
-    //ch_bamfiles.view()    
+    ch_bamfiles.view()    
 
     }
 

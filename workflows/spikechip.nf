@@ -69,7 +69,7 @@ include { BOWTIE2_ALIGN               } from '../modules/nf-core/bowtie2/align/m
 include { PICARD_MARKDUPLICATES       } from '../modules/nf-core/picard/markduplicates/main'
 include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/main'
 include { DEEPTOOLS_BAMCOVERAGE       } from '../modules/nf-core/deeptools/bamcoverage/main'
-include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVERAGE_SCALING  } from '../modules/nf-core/deeptools/bamcoverage/main' 
+include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVSCALING  } from '../modules/nf-core/deeptools/bamcoverage/main' 
 include { BEDTOOLS_MERGE              } from '../modules/nf-core/bedtools/merge/main'
 
 include { SAMTOOLS_FAIDX              } from '../modules/local/samtools/faidx/main'
@@ -100,6 +100,7 @@ workflow SPIKECHIP {
             ch_fasta_meta,
             [[], []]
         )
+    SAMTOOLS_FAIDX.out.fai.map{meta,path -> [path]}.set{faidx_path}
 
     ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions.first())
 
@@ -257,6 +258,8 @@ workflow SPIKECHIP {
 
         //CALCULATEDOWNFACTOR.out.downfile.view()
 
+        //START OF DOWN SAMPLING WITH INPUT
+        if (params.normWithInput) {
         downfl=CALCULATEDOWNFACTOR.out.downfile.flatten() //devi mantenere i progetti separati
         //downfl.view()
 
@@ -348,7 +351,7 @@ workflow SPIKECHIP {
 
         //SAMTOOLS_FAIDX.out.fai.view{"SAMTOOLS_FAIDX.out.fai : ${it}"}
 
-        SAMTOOLS_FAIDX.out.fai.map{meta,path -> [path]}.set{faidx_path}
+        //SAMTOOLS_FAIDX.out.fai.map{meta,path -> [path]}.set{faidx_path}
 
         //faidx_path.flatten().view()
 
@@ -363,6 +366,60 @@ workflow SPIKECHIP {
             faidx_path
         )
 
+        }
+                //END OF DOWNSAMPLING WITH INPUT
+
+        //START OF DOWNSAMPLING WITHOUT INPUT
+
+        noin=CALCULATEDOWNFACTOR.out.noinfile.flatten()
+        //noin.view()
+
+        ch_noin=noin
+            | splitCsv (header: true)
+            | map { row -> 
+                noinss = row.subMap ('id', 'single_end','condition','details','analysis','noinputNorm')
+                [[id:noinss.id, single_end:noinss.single_end, condition:noinss.condition, details:noinss.details, analysis:noinss.analysis, noinputNorm:noinss.noinputNorm]]
+            }
+
+        //ch_noin.view()
+
+        ch_noin.flatten()
+        .map{ meta -> 
+            id=meta.id
+            [id, meta]
+        }
+        .set{ch_noin_by_id}
+
+        //ch_downin.view()
+        //SAMTOOLS_SPLITSPECIES.out.refpath.view()
+
+        SAMTOOLS_SPLITSPECIES.out.refpath.map{meta, bampath, baipath ->
+            id=meta.subMap('id')
+            [id.id, bampath, baipath]
+        }set{ch_id_bam_downin}
+
+        //ch_id_bam_downin.view()
+
+        //ch_id_bam_downin.combine(ch_noin_by_id, by:0).view()
+
+        ch_noin_by_id
+            .combine(ch_id_bam_downin, by:0)
+            .map{id,meta,noinbam, noinbai -> 
+            [meta, noinbam, noinbai]
+            }
+            .set{ch_cov_scaling}
+
+        //ch_cov_scaling.view()
+        
+
+        DEEPTOOLS_BAMCOVSCALING (
+            ch_cov_scaling,
+            params.fasta,
+            faidx_path
+        )
+
+        //END OF DOWNSAMPLING WITHOUT INPUT
+ 
 
  
 

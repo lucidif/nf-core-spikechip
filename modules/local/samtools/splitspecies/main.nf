@@ -18,6 +18,10 @@ process SAMTOOLS_SPLITSPECIES {
     //tuple val(meta), path("*_${ref_name}.bam"), path("*_${ref_name}.bam.bai") ,  emit: refbam
     //tuple val(meta), path("*_${spikein_name}.bam"), path("*_${spikein_name}.bam.bai") ,  emit: spikebam
     tuple val(meta), path("*_${ref_name}.bam"), path("*_${spikein_name}.bam") ,  emit: bam
+    tuple val(meta), path("*_${ref_name}.bam.bai"), path("*_${spikein_name}.bam.bai"), emit : bai
+    tuple val(meta), path("*_${ref_name}.bam"), path("*_${ref_name}.bam.bai"), emit: refpath
+    tuple val(meta), path("*_${spikein_name}.bam"), path("*_${spikein_name}.bam.bai"), emit: spikepath
+
     path  "versions.yml",            emit: versions
 
     when:

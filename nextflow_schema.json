@@ -49,6 +49,11 @@
                     "type" : "boolean",
                     "description": "start from bam file instead of fastq",
                     "help_text": "accordly with present workflow you need to change the location of fastq file with bam file inside input samplesheet"
+                },
+                "normWithInput": {
+                    "type" : "boolean",
+                    "description": "normalize considering input samples",
+                    "help_text": "if true the normalization of data take into account the input files by using Fulsova et al. 2019 approach"
                 }
             }
         },

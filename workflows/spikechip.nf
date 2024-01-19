@@ -280,21 +280,26 @@ workflow SPIKECHIP {
         }
         .set{ch_downfc_by_id}
 
-        SAMTOOLS_SPLITSPECIES.out.bam.map{meta, ref_bam, spike_bam ->
+        // SAMTOOLS_SPLITSPECIES.out.bam.map{meta, ref_bam, spike_bam ->
+        //     id=meta.subMap('id')
+        //     [id.id, ref_bam]
+        // }set{ch_bam_by_id}
+
+        SAMTOOLS_SPLITSPECIES.out.refpath.map{meta, ref_bam, ref_bai ->
             id=meta.subMap('id')
-            [id.id, ref_bam]
+            [id.id, ref_bam, ref_bai]
         }set{ch_bam_by_id}
 
         ch_downfc_by_id
             .combine(ch_bam_by_id, by:0)
-            .map{id,meta,bam -> 
-            [meta,bam]
+            .map{id,meta,bam, bai -> 
+            [meta,bam, bai]
             }
             .set{ch_downfc}
 
         //ch_downin.filter{it[0].downfactor < 1}.view()
-        ch_downin=ch_downfc.filter{it[0].downfactor.toFloat() < 1}
-        ch_nodown=ch_downfc.filter{it[0].downfactor.toFloat() >= 1}
+        ch_downin=ch_downfc.filter{it[0].downfactor.toFloat() < 1}.map{meta,bam,bai->[meta,bam]}
+        ch_nodown=ch_downfc.filter{it[0].downfactor.toFloat() >= 1}//.map{meta,bam,bai->[meta,bam]}
 
         //ch_downin.view()
         //ch_nodown.view()
@@ -306,10 +311,11 @@ workflow SPIKECHIP {
         //SAMTOOLS_DOWNSAMPLING.out.bam.view{"SAMTOOLS_DOWNSAMPLING.out : ${it}"}
 
         ch_tomerge=SAMTOOLS_DOWNSAMPLING.out.bam
+                            .mix(ch_nodown)
                             .map{meta, path, path2 -> 
                                             [meta,path]
                                             }
-                            .mix(ch_nodown)
+                            // .mix(ch_nodown)
                                             
         
         //ch_tomerge.view{"ch_tomerge : ${it}"}
@@ -333,7 +339,7 @@ workflow SPIKECHIP {
                       }
                 .groupTuple()
                 //.flatten()
-                .map{condition, meta, path->
+                .map{condition, meta, path ->
                     //meta.id=meta.condition
                     //id=meta.subMap('condition')
                     //single_end=meta.subMap('single_end')
@@ -355,13 +361,16 @@ workflow SPIKECHIP {
 
         //faidx_path.flatten().view()
 
-        ch_tocov=SAMTOOLS_MERGE.out.bam.mix(SAMTOOLS_DOWNSAMPLING.out.bam)
+        ch_tocov=SAMTOOLS_MERGE.out.bam.mix(SAMTOOLS_DOWNSAMPLING.out.bam) //con questo passato vengono uniti assieme solo i campioni che sono entrati nel dowsampling con quelli uniti, ma quelli che non sono stati inseriti tra i dowsampling no, quindi perdi il campione con downfactor uguale ad 1
+        ch_todeepcoverage=ch_tocov.mix(ch_nodown)
 
         //ch_tocov.view()
+        //ch_todeepcoverage.view()
+        
         //SAMTOOLS_MERGE.out.bam.view()
 
         DEEPTOOLS_BAMCOVERAGE (
-            ch_tocov,
+            ch_todeepcoverage,
             params.fasta,
             faidx_path
         )

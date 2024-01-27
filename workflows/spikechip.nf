@@ -361,6 +361,9 @@ workflow SPIKECHIP {
 
         //faidx_path.flatten().view()
 
+        //metti un if che se merge e' true fa' i passaggi sopra se e' false mixa SAMTOOLS_DOWNSAMPLING.out.bam e ch_nodown solo e va' avanti
+
+
         ch_tocov=SAMTOOLS_MERGE.out.bam.mix(SAMTOOLS_DOWNSAMPLING.out.bam) //con questo passato vengono uniti assieme solo i campioni che sono entrati nel dowsampling con quelli uniti, ma quelli che non sono stati inseriti tra i dowsampling no, quindi perdi il campione con downfactor uguale ad 1
         ch_todeepcoverage=ch_tocov.mix(ch_nodown)
 

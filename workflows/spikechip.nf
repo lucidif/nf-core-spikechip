@@ -71,6 +71,7 @@ include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/mai
 include { DEEPTOOLS_BAMCOVERAGE       } from '../modules/nf-core/deeptools/bamcoverage/main'
 include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVSCALING  } from '../modules/nf-core/deeptools/bamcoverage/main' 
 include { BEDTOOLS_MERGE              } from '../modules/nf-core/bedtools/merge/main'
+include { SAMTOOLS_FLAGSTAT       as  SAMTOOLS_DOWSAMPFLAGSTAT  } from '../modules/nf-core/samtools/flagstat/main.nf'
 
 include { SAMTOOLS_FAIDX              } from '../modules/local/samtools/faidx/main'
 include { SAMTOOLS_SPLITSPECIES       } from '../modules/local/samtools/splitspecies/main.nf'
@@ -308,6 +309,9 @@ workflow SPIKECHIP {
             ch_downin
         )
 
+        SAMTOOLS_DOWSAMPFLAGSTAT(SAMTOOLS_DOWNSAMPLING.out.bam)
+
+
         //SAMTOOLS_DOWNSAMPLING.out.bam.view{"SAMTOOLS_DOWNSAMPLING.out : ${it}"}
 
         ch_tomerge=SAMTOOLS_DOWNSAMPLING.out.bam
@@ -465,6 +469,7 @@ workflow SPIKECHIP {
     if (!params.onlyBAM) {
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.reference.collect{it[1]}.ifEmpty([]))
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.spikein.collect{it[1]}.ifEmpty([]))
+        ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_DOWSAMPFLAGSTAT.out.flagstat.collect{it[1]}.ifEmpty([]))
     }
 
     

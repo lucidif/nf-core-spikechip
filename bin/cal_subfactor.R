@@ -133,8 +133,9 @@ for (j in 1:length(unique(input.table$analysis))){
 }
 
 #no input normalization
-constant=max(out.table$spikein_aln_reads)
-constant/out.table$spikein_aln_reads
+#constant=max(out.table$spikein_aln_reads)
+constant=1000000
+#constant/out.table$spikein_aln_reads
 out.table<-cbind(out.table,noinputNorm=constant/out.table$spikein_aln_reads)
 
 out.table.noinNorm<-out.table[,c("id", "single_end", "condition", "details", "analysis", "noinputNorm")]

@@ -3,6 +3,8 @@
 args <- commandArgs(trailingOnly = TRUE)
 
 in_meta <- args[1]
+scale_fact<- as.numeric(as.character(args[2]))
+calib_c <- as.numeric(as.character(args[3]))
 
 g1<-gsub("\\[\\[",", \\[",in_meta)
 g2<-gsub(", \\[","?",g1)
@@ -134,9 +136,10 @@ for (j in 1:length(unique(input.table$analysis))){
 
 #no input normalization
 #constant=max(out.table$spikein_aln_reads)
-constant=1000000
+#constant=1000000
+
 #constant/out.table$spikein_aln_reads
-out.table<-cbind(out.table,noinputNorm=constant/out.table$spikein_aln_reads)
+out.table<-cbind(out.table,noinputNorm=scale_fact*(calib_c/out.table$spikein_aln_reads))
 
 out.table.noinNorm<-out.table[,c("id", "single_end", "condition", "details", "analysis", "noinputNorm")]
 

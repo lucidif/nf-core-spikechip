@@ -69,6 +69,7 @@ include { BOWTIE2_ALIGN               } from '../modules/nf-core/bowtie2/align/m
 include { PICARD_MARKDUPLICATES       } from '../modules/nf-core/picard/markduplicates/main'
 include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/main'
 include { DEEPTOOLS_BAMCOVERAGE       } from '../modules/nf-core/deeptools/bamcoverage/main'
+include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVNOCALIB  } from '../modules/nf-core/deeptools/bamcoverage/main'
 include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVSCALING  } from '../modules/nf-core/deeptools/bamcoverage/main' 
 include { BEDTOOLS_MERGE              } from '../modules/nf-core/bedtools/merge/main'
 include { SAMTOOLS_FLAGSTAT       as  SAMTOOLS_DOWSAMPFLAGSTAT  } from '../modules/nf-core/samtools/flagstat/main.nf'
@@ -427,11 +428,16 @@ workflow SPIKECHIP {
 
         //ch_cov_scaling.view()
         
-
-        DEEPTOOLS_BAMCOVSCALING (
+        DEEPTOOLS_BAMCOVSCALING ( //scaling parameter is in module config file
             ch_cov_scaling,
             params.fasta,
             faidx_path
+        )
+
+        DEEPTOOLS_BAMCOVNOCALIB ( 
+            ch_cov_scaling,
+            params.fasta,
+            faidx_path  
         )
 
         //END OF DOWNSAMPLING WITHOUT INPUT

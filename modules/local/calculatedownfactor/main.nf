@@ -91,9 +91,12 @@ process CALCULATEDOWNFACTOR {
     //paths.view()
 
     //template 'calculate_downsampling_factor.R'
+               
+    s_factor=params.scale_factor
+    cal_c=params.calibration_c
 
     """
-    cal_subfactor.R '${meta}'
+    cal_subfactor.R '${meta}' ${s_factor} ${cal_c}
     """
 
     // dwnfile=file("down_factor.txt")

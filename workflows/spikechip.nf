@@ -245,11 +245,14 @@ workflow SPIKECHIP {
         //split by analysis
 
         //TODO filter analysis replicates without input
-  
-        CALCULATEDOWNFACTOR (
-           ch_reference_hub,
-           ch_spikein_hub
+
+        if (params.calibStrategy != "no_calibration" ){
+            CALCULATEDOWNFACTOR (
+            ch_reference_hub,
+            ch_spikein_hub
         )
+        }
+
 
         //TODO filter analysis replicates without input
 
@@ -261,153 +264,166 @@ workflow SPIKECHIP {
         //CALCULATEDOWNFACTOR.out.downfile.view()
 
         //START OF DOWN SAMPLING WITH INPUT
-        if (params.normWithInput) {
-        downfl=CALCULATEDOWNFACTOR.out.downfile.flatten() //devi mantenere i progetti separati
-        //downfl.view()
+        if (params.calibStrategy == "with_input"){
 
-        ch_downfact=downfl
-            | splitCsv (header: true)
-            | map { row -> 
-                downss = row.subMap ('id', 'single_end','condition','details','analysis','downfactor')
-                [[id:downss.id, single_end:downss.single_end, condition:downss.condition, details:downss.details, analysis:downss.analysis, downfactor:downss.downfactor]]
+            downfl=CALCULATEDOWNFACTOR.out.calibfile.flatten() //devi mantenere i progetti separati
+            //downfl.view()
+
+            ch_downfact=downfl
+                | splitCsv (header: true)
+                | map { row -> 
+                    downss = row.subMap ('id', 'single_end','condition','details','analysis','downfactor')
+                    [[id:downss.id, single_end:downss.single_end, condition:downss.condition, details:downss.details, analysis:downss.analysis, downfactor:downss.downfactor]]
+                }
+
+            //ch_downfact.flatten().view()
+            //SAMTOOLS_SPLITSPECIES.out.bam.view()
+
+            ch_downfact.flatten()
+            .map{ meta -> 
+                id=meta.id
+                [id, meta]
             }
+            .set{ch_downfc_by_id}
 
-        //ch_downfact.flatten().view()
-        //SAMTOOLS_SPLITSPECIES.out.bam.view()
+            // SAMTOOLS_SPLITSPECIES.out.bam.map{meta, ref_bam, spike_bam ->
+            //     id=meta.subMap('id')
+            //     [id.id, ref_bam]
+            // }set{ch_bam_by_id}
 
-        ch_downfact.flatten()
-        .map{ meta -> 
-            id=meta.id
-            [id, meta]
-        }
-        .set{ch_downfc_by_id}
+            SAMTOOLS_SPLITSPECIES.out.refpath.map{meta, ref_bam, ref_bai ->
+                id=meta.subMap('id')
+                [id.id, ref_bam, ref_bai]
+            }set{ch_bam_by_id}
 
-        // SAMTOOLS_SPLITSPECIES.out.bam.map{meta, ref_bam, spike_bam ->
-        //     id=meta.subMap('id')
-        //     [id.id, ref_bam]
-        // }set{ch_bam_by_id}
+            ch_downfc_by_id
+                .combine(ch_bam_by_id, by:0)
+                .map{id,meta,bam, bai -> 
+                [meta,bam, bai]
+                }
+                .set{ch_downfc}
 
-        SAMTOOLS_SPLITSPECIES.out.refpath.map{meta, ref_bam, ref_bai ->
-            id=meta.subMap('id')
-            [id.id, ref_bam, ref_bai]
-        }set{ch_bam_by_id}
+            //ch_downin.filter{it[0].downfactor < 1}.view()
+            ch_downin=ch_downfc.filter{it[0].downfactor.toFloat() < 1}.map{meta,bam,bai->[meta,bam]}
+            ch_nodown=ch_downfc.filter{it[0].downfactor.toFloat() >= 1}//.map{meta,bam,bai->[meta,bam]}
 
-        ch_downfc_by_id
-            .combine(ch_bam_by_id, by:0)
-            .map{id,meta,bam, bai -> 
-            [meta,bam, bai]
-            }
-            .set{ch_downfc}
+            //ch_downin.view()
+            //ch_nodown.view()
 
-        //ch_downin.filter{it[0].downfactor < 1}.view()
-        ch_downin=ch_downfc.filter{it[0].downfactor.toFloat() < 1}.map{meta,bam,bai->[meta,bam]}
-        ch_nodown=ch_downfc.filter{it[0].downfactor.toFloat() >= 1}//.map{meta,bam,bai->[meta,bam]}
+            SAMTOOLS_DOWNSAMPLING(
+                ch_downin
+            )
 
-        //ch_downin.view()
-        //ch_nodown.view()
-
-        SAMTOOLS_DOWNSAMPLING(
-            ch_downin
-        )
-
-        SAMTOOLS_DOWSAMPFLAGSTAT(SAMTOOLS_DOWNSAMPLING.out.bam)
+            SAMTOOLS_DOWSAMPFLAGSTAT(SAMTOOLS_DOWNSAMPLING.out.bam)
 
 
-        //SAMTOOLS_DOWNSAMPLING.out.bam.view{"SAMTOOLS_DOWNSAMPLING.out : ${it}"}
+            //SAMTOOLS_DOWNSAMPLING.out.bam.view{"SAMTOOLS_DOWNSAMPLING.out : ${it}"}
 
-        ch_tomerge=SAMTOOLS_DOWNSAMPLING.out.bam
-                            .mix(ch_nodown)
-                            .map{meta, path, path2 -> 
-                                            [meta,path]
-                                            }
-                            // .mix(ch_nodown)
-                                            
-        
-        //ch_tomerge.view{"ch_tomerge : ${it}"}
+            ch_tomerge=SAMTOOLS_DOWNSAMPLING.out.bam
+                                .mix(ch_nodown)
+                                .map{meta, path, path2 -> 
+                                                [meta,path]
+                                                }
+                                // .mix(ch_nodown)
+                                                
+            
+            //ch_tomerge.view{"ch_tomerge : ${it}"}
 
-        // ch_tomerge.map{ meta, path -> 
-        //             //meta.id=meta.condition
-        //             //id=meta.subMap('condition')
-        //             //single_end=meta.subMap('single_end')
-        //             [[id:meta.id, single_end:meta.single_end], path]
-        //         }.set{ch_nomergeBam}
+            // ch_tomerge.map{ meta, path -> 
+            //             //meta.id=meta.condition
+            //             //id=meta.subMap('condition')
+            //             //single_end=meta.subMap('single_end')
+            //             [[id:meta.id, single_end:meta.single_end], path]
+            //         }.set{ch_nomergeBam}
 
-        //ch_nomergeBam.view{"ch_nomergeBam : ${it}"}        
+            //ch_nomergeBam.view{"ch_nomergeBam : ${it}"}        
 
-        //il problema e' qui dentro
-        ch_tomerge.map{ meta, path -> 
-                        condition=meta.subMap('condition')
-                        analysis=meta.subMap('analysis')
-                        meta=meta
-                        path=path
-                        [condition.condition + "_" + analysis.analysis, meta, path]
-                      }
-                .groupTuple()
-                //.flatten()
-                .map{condition, meta, path ->
-                    //meta.id=meta.condition
-                    //id=meta.subMap('condition')
-                    //single_end=meta.subMap('single_end')
-                    [[id:meta.analysis[0] + "_" + meta.condition[0] , single_end:meta.single_end[0]], path]
-                }.set{ch_mergeBam}
+            ch_tomerge.map{ meta, path -> 
+                            condition=meta.subMap('condition')
+                            analysis=meta.subMap('analysis')
+                            meta=meta
+                            path=path
+                            [condition.condition + "_" + analysis.analysis, meta, path]
+                        }
+                    .groupTuple()
+                    //.flatten()
+                    .map{condition, meta, path ->
+                        //meta.id=meta.condition
+                        //id=meta.subMap('condition')
+                        //single_end=meta.subMap('single_end')
+                        [[id:meta.analysis[0] + "_" + meta.condition[0] , single_end:meta.single_end[0]], path]
+                    }.set{ch_mergeBam}
 
-        //ch_mergeBam.view{"ch_mergeBam : ${it}"}
+            //ch_mergeBam.view{"ch_mergeBam : ${it}"}
 
-        SAMTOOLS_MERGE (
-            ch_mergeBam
-        )
+            SAMTOOLS_MERGE (
+                ch_mergeBam
+            )
 
-        //SAMTOOLS_MERGE.out.bam.view{"SAMTOOLS_MERGE.out.bam : ${it}"}
-        //ch_fasta_meta.view{"ch_fasta_meta : ${it}"}
+            //SAMTOOLS_MERGE.out.bam.view{"SAMTOOLS_MERGE.out.bam : ${it}"}
+            //ch_fasta_meta.view{"ch_fasta_meta : ${it}"}
 
-        //SAMTOOLS_FAIDX.out.fai.view{"SAMTOOLS_FAIDX.out.fai : ${it}"}
+            //SAMTOOLS_FAIDX.out.fai.view{"SAMTOOLS_FAIDX.out.fai : ${it}"}
 
-        //SAMTOOLS_FAIDX.out.fai.map{meta,path -> [path]}.set{faidx_path}
+            //SAMTOOLS_FAIDX.out.fai.map{meta,path -> [path]}.set{faidx_path}
 
-        //faidx_path.flatten().view()
+            //faidx_path.flatten().view()
 
-        //metti un if che se merge e' true fa' i passaggi sopra se e' false mixa SAMTOOLS_DOWNSAMPLING.out.bam e ch_nodown solo e va' avanti
+            //metti un if che se merge e' true fa' i passaggi sopra se e' false mixa SAMTOOLS_DOWNSAMPLING.out.bam e ch_nodown solo e va' avanti
 
 
-        ch_tocov=SAMTOOLS_MERGE.out.bam.mix(SAMTOOLS_DOWNSAMPLING.out.bam) //con questo passato vengono uniti assieme solo i campioni che sono entrati nel dowsampling con quelli uniti, ma quelli che non sono stati inseriti tra i dowsampling no, quindi perdi il campione con downfactor uguale ad 1
-        ch_todeepcoverage=ch_tocov.mix(ch_nodown)
+            ch_tocov=SAMTOOLS_MERGE.out.bam.mix(SAMTOOLS_DOWNSAMPLING.out.bam) //con questo passato vengono uniti assieme solo i campioni che sono entrati nel dowsampling con quelli uniti, ma quelli che non sono stati inseriti tra i dowsampling no, quindi perdi il campione con downfactor uguale ad 1
+            ch_todeepcoverage=ch_tocov.mix(ch_nodown)
 
-        //ch_tocov.view()
-        //ch_todeepcoverage.view()
-        
-        //SAMTOOLS_MERGE.out.bam.view()
+            //ch_tocov.view()
+            //ch_todeepcoverage.view()
+            
+            //SAMTOOLS_MERGE.out.bam.view()
 
-        DEEPTOOLS_BAMCOVERAGE (
-            ch_todeepcoverage,
-            params.fasta,
-            faidx_path
-        )
+            DEEPTOOLS_BAMCOVERAGE (
+                ch_todeepcoverage,
+                params.fasta,
+                faidx_path
+            )
 
         }
-                //END OF DOWNSAMPLING WITH INPUT
+        //END OF DOWNSAMPLING WITH INPUT
 
         //START OF DOWNSAMPLING WITHOUT INPUT
 
-        noin=CALCULATEDOWNFACTOR.out.noinfile.flatten()
-        //noin.view()
+        if (params.calibStrategy == "no_calibration") {
 
-        ch_noin=noin
-            | splitCsv (header: true)
-            | map { row -> 
-                noinss = row.subMap ('id', 'single_end','condition','details','analysis','noinputNorm')
-                [[id:noinss.id, single_end:noinss.single_end, condition:noinss.condition, details:noinss.details, analysis:noinss.analysis, noinputNorm:noinss.noinputNorm]]
-            }
+            //SAMTOOLS_SPLITSPECIES.out.refpath.view()
 
-        //ch_noin.view()
-
-        ch_noin.flatten()
-        .map{ meta -> 
-            id=meta.id
-            [id, meta]
+            DEEPTOOLS_BAMCOVNOCALIB ( 
+                SAMTOOLS_SPLITSPECIES.out.refpath,
+                params.fasta,
+                faidx_path  
+            )
         }
-        .set{ch_noin_by_id}
 
-        //ch_downin.view()
+        if (params.calibStrategy == "without_input") {
+            
+            noin=CALCULATEDOWNFACTOR.out.calibfile.flatten()
+            //noin.view()
+
+            ch_noin=noin
+                | splitCsv (header: true)
+                | map { row -> 
+                    noinss = row.subMap ('id', 'single_end','condition','details','analysis','noinputNorm')
+                    [[id:noinss.id, single_end:noinss.single_end, condition:noinss.condition, details:noinss.details, analysis:noinss.analysis, noinputNorm:noinss.noinputNorm]]
+                }
+
+            //ch_noin.view()
+
+            ch_noin.flatten()
+            .map{ meta -> 
+                id=meta.id
+                [id, meta]
+            }
+            .set{ch_noin_by_id}
+
+                    //ch_downin.view()
         //SAMTOOLS_SPLITSPECIES.out.refpath.view()
 
         SAMTOOLS_SPLITSPECIES.out.refpath.map{meta, bampath, baipath ->
@@ -426,19 +442,19 @@ workflow SPIKECHIP {
             }
             .set{ch_cov_scaling}
 
-        //ch_cov_scaling.view()
+        ch_cov_scaling.view()
         
+
         DEEPTOOLS_BAMCOVSCALING ( //scaling parameter is in module config file
             ch_cov_scaling,
             params.fasta,
             faidx_path
         )
+     
+        }
 
-        DEEPTOOLS_BAMCOVNOCALIB ( 
-            ch_cov_scaling,
-            params.fasta,
-            faidx_path  
-        )
+
+
 
         //END OF DOWNSAMPLING WITHOUT INPUT
  
@@ -475,6 +491,9 @@ workflow SPIKECHIP {
     if (!params.onlyBAM) {
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.reference.collect{it[1]}.ifEmpty([]))
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_FLAGSTAT.out.spikein.collect{it[1]}.ifEmpty([]))
+    }
+
+    if (!params.onlyBAM && params.calibStrategy == "with_input") {
         ch_multiqc_files = ch_multiqc_files.mix(SAMTOOLS_DOWSAMPFLAGSTAT.out.flagstat.collect{it[1]}.ifEmpty([]))
     }
 

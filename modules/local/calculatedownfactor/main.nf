@@ -57,8 +57,9 @@ process CALCULATEDOWNFACTOR {
     //path "versions.yml"           , emit: versions
     //tuple val(meta), path("down_factor.txt")        , emit: results
     //path("down_factor.txt")                         , emit: downfile
-    path("*_down_factor.txt")                            , emit: downfile
-    path("noinput_norm.txt")                            , emit: noinfile
+    //path("*_down_factor.txt")                            , emit: downfile
+    //path("noinput_norm.txt")                            , emit: noinfile
+    path("*_calib.txt")                            , emit: calibfile
     //val (ch_newmeta)                              , emit: downfactor 
 
     when:
@@ -94,9 +95,10 @@ process CALCULATEDOWNFACTOR {
                
     s_factor=params.scale_factor
     cal_c=params.calibration_c
+    calib_mode=params.calibStrategy
 
     """
-    cal_subfactor.R '${meta}' ${s_factor} ${cal_c}
+    cal_subfactor.R '${meta}' '${s_factor}' '${cal_c}' '${calib_mode}'
     """
 
     // dwnfile=file("down_factor.txt")

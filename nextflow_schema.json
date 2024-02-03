@@ -54,6 +54,11 @@
                     "type" : "boolean",
                     "description": "normalize considering input samples",
                     "help_text": "if true the normalization of data take into account the input files by using Fulsova et al. 2019 approach"
+                },
+                "calibStrategy": {
+                    "type": "string",
+                    "description": "you can choose between 'with_input', 'without_input', 'no_calibration'",
+                    "help_text": "by selecting 'with_input' the calibration strategy takes into account the presence of input samples (Fursova et al 2019), by selecting 'without_input' the calibration strategy does not take into account input samples (constant value/total spike-in reads in sample), by selecting no_calibration no calibration is applied to samples"
                 }
             }
         },

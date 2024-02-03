@@ -65,9 +65,7 @@ include { FASTQC                      } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 include { BOWTIE2_ALIGN               } from '../modules/nf-core/bowtie2/align/main.nf'
-//include { SAMBAMBA_MARKDUP            } from '../modules/nf-core/sambamba/markdup/main'
 include { PICARD_MARKDUPLICATES       } from '../modules/nf-core/picard/markduplicates/main'
-//include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/main'
 include { TRIMGALORE                  } from '../modules/nf-core/trimgalore/main'
 include { DEEPTOOLS_BAMCOVERAGE       } from '../modules/nf-core/deeptools/bamcoverage/main'
 include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVNOCALIB  } from '../modules/nf-core/deeptools/bamcoverage/main'
@@ -148,13 +146,11 @@ workflow SPIKECHIP {
 
         ch_bamfiles=BOWTIE2_ALIGN.out.aligned
 
-        //SAMBAMBA_MARKDUP (BOWTIE2_ALIGN.out.aligned)
-
         //BOWTIE2_ALIGN.out.aligned.view()
                 
     } else {
-     //input start channel   
-     //[[id:SPT5_INPUT_REP2_T1, single_end:false], /mnt/c/wkdir/lucio/test_nf_spikeinchip/work/f3/67c45d925563552cb242de816b4fa3/SPT5_INPUT_REP2_T1.bam]
+    
+    //input start channel   
 
     ch_bamfiles=channel.fromPath(params.input)
         | splitCsv (header: true)
@@ -234,12 +230,6 @@ workflow SPIKECHIP {
 
                              }                   
         
-        // ch_meta_collect=SAMTOOLS_FLAGSTAT.out.reference.map{meta, path -> 
-        //     newmeta=meta.collect()
-        // }
-
- 
-
         //ch_reference_hub.view()
         //ch_spikein_hub.view{"spikein: ${it}"}
 
@@ -254,13 +244,7 @@ workflow SPIKECHIP {
         )
         }
 
-
         //TODO filter analysis replicates without input
-
-        // CALCULATEDOWNFACTOR (
-        //    ch_refstat_by_analysis,
-        //    ch_spikestat_by_analysis
-        // )
 
         //CALCULATEDOWNFACTOR.out.downfile.view()
 
@@ -286,11 +270,6 @@ workflow SPIKECHIP {
                 [id, meta]
             }
             .set{ch_downfc_by_id}
-
-            // SAMTOOLS_SPLITSPECIES.out.bam.map{meta, ref_bam, spike_bam ->
-            //     id=meta.subMap('id')
-            //     [id.id, ref_bam]
-            // }set{ch_bam_by_id}
 
             SAMTOOLS_SPLITSPECIES.out.refpath.map{meta, ref_bam, ref_bai ->
                 id=meta.subMap('id')
@@ -324,20 +303,7 @@ workflow SPIKECHIP {
                                 .mix(ch_nodown)
                                 .map{meta, path, path2 -> 
                                                 [meta,path]
-                                                }
-                                // .mix(ch_nodown)
-                                                
-            
-            //ch_tomerge.view{"ch_tomerge : ${it}"}
-
-            // ch_tomerge.map{ meta, path -> 
-            //             //meta.id=meta.condition
-            //             //id=meta.subMap('condition')
-            //             //single_end=meta.subMap('single_end')
-            //             [[id:meta.id, single_end:meta.single_end], path]
-            //         }.set{ch_nomergeBam}
-
-            //ch_nomergeBam.view{"ch_nomergeBam : ${it}"}        
+                                                }        
 
             ch_tomerge.map{ meta, path -> 
                             condition=meta.subMap('condition')
@@ -347,11 +313,8 @@ workflow SPIKECHIP {
                             [condition.condition + "_" + analysis.analysis, meta, path]
                         }
                     .groupTuple()
-                    //.flatten()
+                    
                     .map{condition, meta, path ->
-                        //meta.id=meta.condition
-                        //id=meta.subMap('condition')
-                        //single_end=meta.subMap('single_end')
                         [[id:meta.analysis[0] + "_" + meta.condition[0] , single_end:meta.single_end[0]], path]
                     }.set{ch_mergeBam}
 
@@ -366,14 +329,7 @@ workflow SPIKECHIP {
 
             //SAMTOOLS_FAIDX.out.fai.view{"SAMTOOLS_FAIDX.out.fai : ${it}"}
 
-            //SAMTOOLS_FAIDX.out.fai.map{meta,path -> [path]}.set{faidx_path}
-
-            //faidx_path.flatten().view()
-
-            //metti un if che se merge e' true fa' i passaggi sopra se e' false mixa SAMTOOLS_DOWNSAMPLING.out.bam e ch_nodown solo e va' avanti
-
-
-            ch_tocov=SAMTOOLS_MERGE.out.bam.mix(SAMTOOLS_DOWNSAMPLING.out.bam) //con questo passato vengono uniti assieme solo i campioni che sono entrati nel dowsampling con quelli uniti, ma quelli che non sono stati inseriti tra i dowsampling no, quindi perdi il campione con downfactor uguale ad 1
+            ch_tocov=SAMTOOLS_MERGE.out.bam.mix(SAMTOOLS_DOWNSAMPLING.out.bam) 
             ch_todeepcoverage=ch_tocov.mix(ch_nodown)
 
             //ch_tocov.view()
@@ -424,7 +380,7 @@ workflow SPIKECHIP {
             }
             .set{ch_noin_by_id}
 
-                    //ch_downin.view()
+        //ch_downin.view()
         //SAMTOOLS_SPLITSPECIES.out.refpath.view()
 
         SAMTOOLS_SPLITSPECIES.out.refpath.map{meta, bampath, baipath ->
@@ -443,7 +399,7 @@ workflow SPIKECHIP {
             }
             .set{ch_cov_scaling}
 
-        ch_cov_scaling.view()
+        //ch_cov_scaling.view()
         
 
         DEEPTOOLS_BAMCOVSCALING ( //scaling parameter is in module config file
@@ -454,14 +410,8 @@ workflow SPIKECHIP {
      
         }
 
-
-
-
         //END OF DOWNSAMPLING WITHOUT INPUT
  
-
- 
-
     }        
 
     CUSTOM_DUMPSOFTWAREVERSIONS (

@@ -67,7 +67,8 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoft
 include { BOWTIE2_ALIGN               } from '../modules/nf-core/bowtie2/align/main.nf'
 //include { SAMBAMBA_MARKDUP            } from '../modules/nf-core/sambamba/markdup/main'
 include { PICARD_MARKDUPLICATES       } from '../modules/nf-core/picard/markduplicates/main'
-include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/main'
+//include { TRIMMOMATIC                 } from '../modules/nf-core/trimmomatic/main'
+include { TRIMGALORE                  } from '../modules/nf-core/trimgalore/main'
 include { DEEPTOOLS_BAMCOVERAGE       } from '../modules/nf-core/deeptools/bamcoverage/main'
 include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVNOCALIB  } from '../modules/nf-core/deeptools/bamcoverage/main'
 include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVSCALING  } from '../modules/nf-core/deeptools/bamcoverage/main' 
@@ -122,12 +123,12 @@ workflow SPIKECHIP {
         // MODULE: Run FastQC
         //
 
-        TRIMMOMATIC (
+        TRIMGALORE (
             INPUT_CHECK.out.reads  
         )
 
         FASTQC (
-            TRIMMOMATIC.out.trimmed_reads
+            TRIMGALORE.out.reads
         )
         ch_versions = ch_versions.mix(FASTQC.out.versions.first())
 
@@ -137,7 +138,7 @@ workflow SPIKECHIP {
         ch_bowtie2_index = [ [:], file(params.bowtie2_index) ]
 
         BOWTIE2_ALIGN (
-            TRIMMOMATIC.out.trimmed_reads,
+            TRIMGALORE.out.reads,
             ch_bowtie2_index,
             false,
             "sort"

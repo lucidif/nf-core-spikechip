@@ -37,18 +37,23 @@ process SAMTOOLS_SPLITSPECIES {
     //                 args.contains("--output-fmt bam") ? "bam" :
     //                 args.contains("--output-fmt cram") ? "cram" :
     //                 input.getExtension()
+    def filter_params    = meta.single_end ? '-F 0x004' : '-F 0x004 -F 0x0008 -f 0x001'
 
     """
 
     samtools \\
         view \\
         --threads ${task.cpus-1} \\
+        $filter_params \\
+        -q 10 \\
         -h \\
         ${input} | grep -v ${spikein_name} | sed s/${ref_name}\\_chr/chr/g | samtools view -bhS - > ${meta.id}_${ref_name}.bam
 
     samtools \\
         view \\
         --threads ${task.cpus-1} \\
+        $filter_params \\
+        -q 10 \\
         -h \\
         ${input} | grep -v ${ref_name} | sed s/${spikein_name}\\_chr/chr/g | samtools view -bhS - > ${meta.id}_${spikein_name}.bam 
 

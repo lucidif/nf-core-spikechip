@@ -39,6 +39,7 @@ process SAMTOOLS_SPLITSPECIES {
     //                 input.getExtension()
 
     """
+
     samtools \\
         view \\
         --threads ${task.cpus-1} \\

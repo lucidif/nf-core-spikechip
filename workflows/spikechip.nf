@@ -72,6 +72,7 @@ include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVNOCALIB  } from '../module
 include { DEEPTOOLS_BAMCOVERAGE   as  DEEPTOOLS_BAMCOVSCALING  } from '../modules/nf-core/deeptools/bamcoverage/main' 
 include { BEDTOOLS_MERGE              } from '../modules/nf-core/bedtools/merge/main'
 include { SAMTOOLS_FLAGSTAT       as  SAMTOOLS_DOWSAMPFLAGSTAT  } from '../modules/nf-core/samtools/flagstat/main.nf'
+include { SAMTOOLS_BAM2FQ             } from '../modules/nf-core/samtools/bam2fq/main'
 
 include { SAMTOOLS_FAIDX              } from '../modules/local/samtools/faidx/main'
 include { SAMTOOLS_SPLITSPECIES       } from '../modules/local/samtools/splitspecies/main.nf'
@@ -185,6 +186,11 @@ workflow SPIKECHIP {
             SAMTOOLS_SPLITSPECIES.out.bam
         )
         //SAMTOOLS_FLAGSTAT.out.flagstat.view()
+
+        SAMTOOLS_BAM2FQ (
+            SAMTOOLS_SPLITSPECIES.out.refpath,
+            "TRUE"
+        )
 
         //ch_meta_hub=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta,path -> meta}.collect()
         //ch_path_hub=SAMTOOLS_FLAGSTAT.out.flagstat.map{meta,path -> path}.collect()

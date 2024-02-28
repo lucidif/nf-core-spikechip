@@ -69,6 +69,20 @@
                     "type": "number",
                     "description": "moltiplier applied to calibration without input",
                     "help_text": "it a value applied as multiplaier of equation for without input normalization"
+                },
+                "bamtools_filter_pe_config": {
+                    "type": "string",
+                    "default": "$projectDir/assets/bamtools_filter_pe.json",
+                    "hidden": true,
+                    "description": "BAMTools JSON file with custom filters for paired-end data.",
+                    "fa_icon": "fas fa-cog"
+                },
+                "bamtools_filter_se_config": {
+                    "type": "string",
+                    "default": "$projectDir/assets/bamtools_filter_se.json",
+                    "hidden": true,
+                    "description": "BAMTools JSON file with custom filters for single-end data.",
+                    "fa_icon": "fas fa-cog"
                 }
             }
         },
